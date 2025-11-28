@@ -25,7 +25,8 @@ sys.modules["Qub.CTools"] = mock.Mock()
 
 def parse_args(argv):
     # by default load the 'demo' mocked beamline
-    hwr_directory = str(Path(Path(__file__).parents[1], "demo"))
+    hwr_directory = "/nfs/ruche/share-dev/px2dev/MXCuBE/WebApp/config" #str(Path(Path(__file__).parents[1], "demo"))
+
 
     opt_parser = argparse.ArgumentParser(
         description="mxcube-web Backend server command line utility."
