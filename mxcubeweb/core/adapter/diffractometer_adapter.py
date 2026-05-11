@@ -1,6 +1,7 @@
 from typing import ClassVar
 
 from mxcubecore.HardwareObjects import GenericDiffractometer, MiniDiff
+from mxcubecore.HardwareObjects.abstract import AbstractDiffractometer
 
 from mxcubeweb.core.adapter.adapter_base import AdapterBase
 from mxcubeweb.core.models.configmodels import ResourceHandlerConfigModel
@@ -18,6 +19,7 @@ class DiffractometerAdapter(AdapterBase):
     SUPPORTED_TYPES: ClassVar[list[object]] = [
         MiniDiff.MiniDiff,
         GenericDiffractometer.GenericDiffractometer,
+        AbstractDiffractometer.AbstractDiffractometer,
     ]
 
     def __init__(  # noqa: D417
