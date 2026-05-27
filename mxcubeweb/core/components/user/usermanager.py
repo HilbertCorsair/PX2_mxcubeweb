@@ -545,6 +545,15 @@ class UserManager(BaseUserManager):
         """
         self._debug("_login. login_id=%s" % login_id)
         local_domains = self.app.CONFIG.app.LOCAL_DOMAINS
+
+        # SOLEIL: validate credentials against LDAP first, then ISPyB. Mirrors the
+        # sister-repo `session.px1_authorisation` step. LDAP-down → no login.
+        ldap_ho = HWR.beamline.lims.get_object_by_role("ldapserver")
+        if ldap_ho is not None:
+            ok, ldap_msg = ldap_ho.login(login_id, password)
+            if not ok:
+                raise PermissionError(f"LDAP authentication failed: {ldap_msg}")
+
         try:
             session_manager: LimsSessionManager = HWR.beamline.lims.login(
                 login_id, password, is_local_host(local_domains)
@@ -552,6 +561,15 @@ class UserManager(BaseUserManager):
         except Exception as e:
             logging.getLogger("MX3.HWR").error(e)
             raise e
+
+        # SOLEIL: populate session identity post-login. Matches the sister repo
+        # behaviour where the SOLEILSession's username / projuser / uid / gid
+        # are filled only after LIMS login succeeds (not at app startup).
+        if hasattr(HWR.beamline.session, "set_user_info"):
+            try:
+                HWR.beamline.session.set_user_info(login_id, projuser=login_id)
+            except Exception:
+                logging.getLogger("HWR").exception("set_user_info failed")
 
         self._debug(
             "_login. proposal_tuple retrieved. Sessions=%s "
