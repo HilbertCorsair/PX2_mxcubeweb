@@ -34,6 +34,13 @@ class NStateModel(HOActuatorModel):
     value: str = Field("", description="Value of nstate object")
 
 
+class HOLightModel(HOActuatorModel):
+    switch_value: str = Field("OUT", description="Light on/off state (IN or OUT)")
+    switch_commands: list[str] = Field(
+        ["IN", "OUT"], description="Available switch states"
+    )
+
+
 class HOMachineInfoModel(HOModel):
     limits: tuple[float | None, float | None] = Field(
         (-1, -1), description="Limits (min max)"

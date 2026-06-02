@@ -2,6 +2,7 @@
 import { Button, OverlayTrigger, Popover } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { sendExecuteCommand } from '../../api/hardware-object';
 import { setAttribute } from '../../actions/beamline';
 import { HW_STATE } from '../../constants';
 import styles from './SampleControls.module.css';
@@ -12,17 +13,16 @@ function LightControl(props) {
 
   const light = useSelector((state) => state.beamline.hardwareObjects[hwoId]);
 
-  const lightSwitch = useSelector(
-    (state) => state.beamline.hardwareObjects[`${hwoId}switch`],
-  );
+  if (!light) {
+    return null;
+  }
+
+  const switchValue = light.switch_value || 'OUT';
+  const switchCommands = light.switch_commands || ['IN', 'OUT'];
 
   function handleToggleClick() {
-    dispatch(
-      setAttribute(
-        `${hwoId}switch`,
-        lightSwitch.commands.find((state) => state !== lightSwitch.value),
-      ),
-    );
+    const next = switchCommands.find((cmd) => cmd !== switchValue);
+    sendExecuteCommand('light', hwoId, 'set_switch', { value: next });
   }
 
   return (
@@ -54,7 +54,7 @@ function LightControl(props) {
               ref={ref}
               className={styles.lightBtn}
               data-default-styles
-              active={lightSwitch.value === lightSwitch.commands[0]}
+              active={switchValue === 'IN'}
               title={`${label} on/off`}
               onClick={handleToggleClick}
             >
