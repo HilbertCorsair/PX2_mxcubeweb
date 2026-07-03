@@ -96,6 +96,10 @@ export function videoMessageOverlay(show, msg) {
   return { type: 'SHOW_VIDEO_MESSAGE_OVERLAY', show, msg };
 }
 
+export function selectCamera(name) {
+  return { type: 'SELECT_CAMERA', name };
+}
+
 export function setVideoSize(width, height) {
   return async (dispatch, getState) => {
     const { sampleview } = getState();

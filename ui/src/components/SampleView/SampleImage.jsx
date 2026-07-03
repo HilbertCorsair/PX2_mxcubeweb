@@ -3,6 +3,7 @@
 import 'fabric';
 
 import React from 'react';
+import { Dropdown } from 'react-bootstrap';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 
@@ -16,6 +17,7 @@ import {
   moveToBeam,
   recordCentringClick,
   rotateToShape,
+  selectCamera,
   setImageRatio,
   setOverlay,
   showContextMenu,
@@ -123,8 +125,12 @@ class SampleImage extends React.Component {
       // #NOSONAR
       this.setImageRatio();
     }
-    // Initialize JSMpeg for decoding the MPEG1 stream
-    if (prevProps.videoFormat !== 'MPEG1') {
+    // Initialize JSMpeg for decoding the MPEG1 stream. Re-init when the format
+    // becomes MPEG1 or when the stream URL changes (e.g. switching camera).
+    if (
+      prevProps.videoFormat !== 'MPEG1' ||
+      prevProps.videoURL !== this.props.videoURL
+    ) {
       this.initJSMpeg();
     }
 
@@ -341,6 +347,11 @@ class SampleImage extends React.Component {
   goToBeam(e) {
     const { imageRatio } = this.props;
 
+    // Beam geometry is only valid on the OAV/centring camera.
+    if (!this.props.centringEnabled) {
+      return;
+    }
+
     // Only move to beam if the click was done directly on the canvas.
     if (e.target.tagName === 'CANVAS' && e.shiftKey) {
       this.props.moveToBeam(e.layerX / imageRatio, e.layerY / imageRatio);
@@ -520,7 +531,7 @@ class SampleImage extends React.Component {
 
     const { clickCentring, measureDistance, imageRatio, drawGrid } = this.props;
 
-    if (clickCentring) {
+    if (clickCentring && this.props.centringEnabled) {
       this.canvas.selection = false; // Disable group selection
       this.props.recordCentringClick(
         option.e.layerX / imageRatio,
@@ -779,11 +790,22 @@ class SampleImage extends React.Component {
     return result;
   }
 
+  selectedCameraLabel() {
+    const cam = this.props.cameras.find(
+      (c) => c.name === this.props.selectedCamera,
+    );
+    return cam ? cam.label : 'Camera';
+  }
+
   createVideoPlayerContainer(format) {
     let source = '/mxcube/api/v0.1/sampleview/camera/subscribe';
 
     if (this.props.videoURL !== '') {
-      source = `${this.props.videoURL}/${this.props.videoHash}`;
+      // argussight streams carry the stream name in the URL, so no separate
+      // hash is appended (videoHash empty). The legacy path appends the hash.
+      source = this.props.videoHash
+        ? `${this.props.videoURL}/${this.props.videoHash}`
+        : this.props.videoURL;
     }
 
     let result = (
@@ -809,7 +831,9 @@ class SampleImage extends React.Component {
       let source =
         this.props.videoURL || `http://${document.location.hostname}:4042/`;
 
-      source = `${source}/${this.props.videoHash}`;
+      if (this.props.videoHash) {
+        source = `${source}/${this.props.videoHash}`;
+      }
 
       if (this.player) {
         this.player.stop();
@@ -846,6 +870,14 @@ class SampleImage extends React.Component {
     } = this.props;
 
     this.drawCanvas(imageRatio, sourceScale);
+
+    // Non-OAV cameras have no centring geometry: show the raw video only, with
+    // an empty overlay canvas (already cleared/sized by drawCanvas).
+    if (!this.props.centringEnabled) {
+      this.canvas.requestRenderAll();
+      return;
+    }
+
     this.canvas.add(
       ...makeImageOverlay(
         imageRatio,
@@ -957,6 +989,37 @@ class SampleImage extends React.Component {
             />
             {this.createVideoPlayerContainer(this.props.videoFormat)}
 
+            {this.props.cameras && this.props.cameras.length > 1 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '5px',
+                  left: '5px',
+                  zIndex: 100,
+                }}
+              >
+                <Dropdown
+                  onSelect={(name) => this.props.selectCamera(name)}
+                  id="camera-selector"
+                >
+                  <Dropdown.Toggle size="sm" variant="outline-light">
+                    {this.selectedCameraLabel()}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    {this.props.cameras.map((cam) => (
+                      <Dropdown.Item
+                        key={cam.name}
+                        eventKey={cam.name}
+                        active={cam.name === this.props.selectedCamera}
+                      >
+                        {cam.label}
+                      </Dropdown.Item>
+                    ))}
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+            )}
+
             <SampleControls canvas={this.canvas} />
             <div>{this.centringMessage()}</div>
 
@@ -995,6 +1058,9 @@ function mapStateToProps(state) {
     videoURL: state.sampleview.videoURL,
     videoHash: state.sampleview.videoHash,
     videoFormat: state.sampleview.videoFormat,
+    cameras: state.sampleview.cameras,
+    selectedCamera: state.sampleview.selectedCamera,
+    centringEnabled: state.sampleview.centringEnabled,
   };
 }
 
@@ -1010,6 +1076,7 @@ function mapDispatchToProps(dispatch) {
     rotateToShape: bindActionCreators(rotateToShape, dispatch),
     recordCentringClick: bindActionCreators(recordCentringClick, dispatch),
     moveToBeam: bindActionCreators(moveToBeam, dispatch),
+    selectCamera: bindActionCreators(selectCamera, dispatch),
     addShape: bindActionCreators(addShape, dispatch),
     updateShapes: bindActionCreators(updateShapes, dispatch),
     deleteShape: bindActionCreators(deleteShape, dispatch),

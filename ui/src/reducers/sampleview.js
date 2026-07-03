@@ -8,6 +8,9 @@ const INITIAL_STATE = {
   videoFormat: 'MJPEG',
   videoHash: '',
   videoURL: '',
+  cameras: [],
+  selectedCamera: '',
+  centringEnabled: true,
   sourceIsScalable: false,
   videoSizes: [],
   imageRatio: 0,
@@ -137,7 +140,26 @@ function sampleViewReducer(state = INITIAL_STATE, action = {}) {
         gridCount: 0,
       };
     }
+    case 'SELECT_CAMERA': {
+      const cam = state.cameras.find((c) => c.name === action.name);
+      if (!cam) {
+        return state;
+      }
+      return {
+        ...state,
+        selectedCamera: cam.name,
+        videoURL: cam.url,
+        videoHash: '',
+        videoFormat: cam.format,
+        width: cam.width || state.width,
+        height: cam.height || state.height,
+        // Centring shapes/interactions are only valid on the OAV camera.
+        centringEnabled: Boolean(cam.oav),
+      };
+    }
     case 'SET_INITIAL_STATE': {
+      const cameras = action.data.camera.cameras || [];
+      const oavCamera = cameras.find((cam) => cam.oav) || cameras[0];
       return {
         ...state,
         width: action.data.camera.imageWidth,
@@ -147,6 +169,9 @@ function sampleViewReducer(state = INITIAL_STATE, action = {}) {
         sourceIsScalable: action.data.camera.sourceIsScalable,
         videoHash: action.data.camera.videoHash,
         videoURL: action.data.camera.videoURL,
+        cameras,
+        selectedCamera: oavCamera ? oavCamera.name : '',
+        centringEnabled: true,
         apertureList: action.data.beamInfo.apertureList,
         currentAperture: action.data.beamInfo.currentAperture,
         beamPosition: action.data.beamInfo.position,

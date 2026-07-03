@@ -215,7 +215,7 @@ class SampleViewAdapter(AdapterBase):
         beam_ho = HWR.beamline.beam
         sx, sy, shape, _label = beam_ho.get_value()
 
-        return {
+        data = {
             "pixelsPerMm": pixels_per_mm,
             "imageWidth": width,
             "imageHeight": height,
@@ -230,6 +230,57 @@ class SampleViewAdapter(AdapterBase):
             "size_y": sy,
             "shape": shape.value,
         }
+
+        # When argussight is enabled, the beamline cameras (including the OAV /
+        # centring camera) are aggregated by argussight. Expose the full list so
+        # the sample view can switch between them, and default the main view to
+        # the OAV stream. Discovery is guarded: on failure `cameras` is empty and
+        # the OAV keeps its direct video-streamer URL above.
+        cameras, oav_url = self._argussight_cameras()
+        data["cameras"] = cameras
+        if oav_url:
+            # argussight streams are addressed by name in the URL itself, so no
+            # separate hash is appended by the frontend (videoHash empty).
+            data["videoURL"] = oav_url
+            data["videoHash"] = ""
+
+        return data
+
+    def _argussight_cameras(self):
+        """Discover the argussight camera streams for the sample view.
+
+        Returns:
+            tuple[list[dict], str]: the list of camera components (for the camera
+            selector) and the full WebSocket URL of the OAV/centring stream. Both
+            empty when argussight is disabled or unreachable.
+        """
+        cfg = self.app.CONFIG.app
+        if not cfg.ARGUSSIGHT_ENABLED:
+            return [], ""
+
+        from mxcubeweb.core.util.argussight_discovery import discover_streams
+
+        cameras_meta = {
+            cam.name: {
+                "label": cam.label,
+                "width": cam.width,
+                "height": cam.height,
+                "format": cam.format,
+                "oav": cam.oav,
+            }
+            for cam in cfg.ARGUSSIGHT_CAMERAS
+        }
+        cameras = discover_streams(
+            cfg.ARGUSSIGHT_GRPC_HOST,
+            cfg.ARGUSSIGHT_GRPC_PORT,
+            cfg.ARGUSSIGHT_PROXY_URL,
+            cameras_meta,
+        )
+        if not cameras:
+            return [], ""
+
+        oav = next((cam for cam in cameras if cam.get("oav")), cameras[0])
+        return cameras, oav["url"]
 
     def shapes(self) -> list:
         return {shape.id: to_camel(shape.as_dict()) for shape in self._ho.get_shapes()}

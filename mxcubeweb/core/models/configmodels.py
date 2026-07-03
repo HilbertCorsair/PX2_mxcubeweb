@@ -92,6 +92,24 @@ class _UICameraConfigModel(BaseModel):
     height: int | None = None
 
 
+class _ArgussightCameraModel(BaseModel):
+    """Optional display metadata for an argussight stream.
+
+    `name` must match the stream name registered in argussight (the name used
+    to build ws://<host>:<proxy_port>/ws/<name>). The remaining fields are only
+    used for how the stream is presented in the camera switcher.
+    """
+
+    name: str
+    label: str | None = None
+    width: int | None = None
+    height: int | None = None
+    format: str = "MPEG1"
+    # True for the centring (OAV) camera. The main sample view enables the
+    # centring overlay only for this stream.
+    oav: bool = False
+
+
 class _UISampleViewVideoControlsModel(BaseModel):
     id: str
     show: bool
@@ -234,6 +252,34 @@ class MXCUBEAppConfigModel(BaseModel):
         9000,
         description="Session refresh interval in milliseconds",
     )
+
+    # Argussight multi-camera integration. When enabled, the "Beamline Cameras"
+    # switcher is populated dynamically from argussight's `GetProcesses` gRPC
+    # call instead of the static `camera_setup` list in ui.yaml. Discovery is
+    # fully guarded: if argussight is unreachable the static list is kept.
+    ARGUSSIGHT_ENABLED: bool = Field(
+        False,
+        description="Discover beamline camera streams from argussight via gRPC",
+    )
+    ARGUSSIGHT_GRPC_HOST: str = Field(
+        "localhost",
+        description="Host of the argussight gRPC server",
+    )
+    ARGUSSIGHT_GRPC_PORT: int = Field(
+        50051,
+        description="Port of the argussight gRPC server",
+    )
+    ARGUSSIGHT_PROXY_URL: str = Field(
+        "",
+        description="Base WebSocket URL of the argussight stream proxy, "
+        "e.g. ws://<host>:7000/ws",
+    )
+    ARGUSSIGHT_CAMERAS: list[_ArgussightCameraModel] = Field(
+        [],
+        description="Optional per-stream display metadata (label/size/format). "
+        "When set, only these streams are shown, in this order.",
+    )
+
     usermanager: UserManagerConfigModel
     ui_properties: dict[str, UIPropertiesModel] = {}
 
