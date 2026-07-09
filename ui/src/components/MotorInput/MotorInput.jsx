@@ -30,6 +30,11 @@ function MotorInput(props) {
       state.queue.queueStatus === QUEUE_RUNNING,
   );
 
+  if (!motor) {
+    // attribute not served (e.g. NState / missing HO) — don't blank the whole panel
+    return null;
+  }
+
   const { state, value } = motor;
   const isReady = state === HW_STATE.READY;
   const id = `${idPrefix}_${role}`;

@@ -124,15 +124,16 @@ function BeamlineSetupContainer() {
     for (const uiprop of uiprop_list) {
       const beamline_attribute = hardwareObjects[uiprop.attribute];
 
+      // Key on attribute + label so multiple entries can share one HO
+      // (e.g. "Cryo" and "Sample Temp." both reading the cryo actuator)
+      const key = `${uiprop.attribute}-${uiprop.label}`;
+
       components.push(
-        <td
-          key={`bs-name-${uiprop.attribute}`}
-          className="py-1 ps-3 pe-2 align-middle"
-        >
+        <td key={`bs-name-${key}`} className="py-1 ps-3 pe-2 align-middle">
           <span className="me-1">{uiprop.label}:</span>
         </td>,
         <td
-          key={`bs-val-${uiprop.attribute}`}
+          key={`bs-val-${key}`}
           style={{
             padding: '0.125rem 0.625rem 0.125rem 0',
             verticalAlign: 'middle',
