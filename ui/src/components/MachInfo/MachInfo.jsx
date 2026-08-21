@@ -40,6 +40,14 @@ function MachInfo(props) {
 
   popContent = <span>{popContent}</span>;
 
+  // The sample temperature (Tango cryostream800/sampleTemp) is published by
+  // machine_info as a raw number; show it as its own badge next to the ring
+  // current. Guard against it being absent (e.g. cryostream offline).
+  const rawTemp = info.sampleTemp;
+  const hasTemp =
+    rawTemp !== undefined && rawTemp !== null && !Number.isNaN(Number(rawTemp));
+  const sampleTemp = hasTemp ? `${Number(rawTemp).toFixed(1)} K` : null;
+
   const machineInfoPop = (
     <Popover id="popover-machineInfo">
       <Popover.Header>{tooltipTitle}</Popover.Header>
@@ -56,6 +64,16 @@ function MachInfo(props) {
         <Badge className={styles.msgLabelStyle} bg={variant}>
           {info.current}
         </Badge>
+        {hasTemp && (
+          <>
+            <Badge className={styles.machineLabel} bg="secondary">
+              Sample Temp
+            </Badge>
+            <Badge className={styles.msgLabelStyle} bg={variant}>
+              {sampleTemp}
+            </Badge>
+          </>
+        )}
       </div>
     </OverlayTrigger>
   );

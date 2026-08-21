@@ -552,36 +552,69 @@ export default function SampleListViewContainer() {
   }
 
   function getSynchronizationDropDownList() {
+    // Two-step flow. Before any samples are loaded, the primary action pulls
+    // the default configuration from the sample changer ("Get samples"). Once
+    // the list is populated the primary action becomes "Sync with <LIMS>"
+    // (fetch from ISPyB). The alternate step stays reachable in the dropdown.
+    const hasSamples = Object.keys(sampleList).length > 0;
+    const hasLims =
+      Array.isArray(loginData.limsName) && loginData.limsName.length > 0;
+    const primaryLims = hasLims ? loginData.limsName[0].name : null;
+
+    const showGetFromSC = showGetSamplesFromSC && !hasSamples;
+
+    const primary = showGetFromSC
+      ? {
+          label: 'Get samples',
+          onClick: getSamplesFromSC,
+          tooltip: 'Populate the sample list from the sample changer',
+        }
+      : {
+          label: primaryLims ? `Sync with ${primaryLims}` : 'Get samples',
+          onClick: primaryLims
+            ? () => handleGetLimsSamples(primaryLims)
+            : getSamplesFromSC,
+          tooltip: primaryLims
+            ? `Synchronise sample list with ${primaryLims}`
+            : 'Populate the sample list from the sample changer',
+        };
+
+    // When the primary action is not a LIMS sync, offer every LIMS in the
+    // dropdown; otherwise skip the first (already the primary button).
+    const extraLims = hasLims
+      ? loginData.limsName.slice(showGetFromSC || !primaryLims ? 0 : 1)
+      : [];
+    const showToggle =
+      extraLims.length > 0 || (showGetSamplesFromSC && hasSamples);
+
     return (
       <Dropdown as={ButtonGroup}>
         <TooltipTrigger
           id="sync-samples-tooltip"
-          tooltipContent={`Synchronise sample list with ${loginData.limsName[0]?.name},
-          and apply filter to only show with LIMS samples`}
+          tooltipContent={primary.tooltip}
         >
           <Button
             variant="outline-secondary"
             className={styles.actionBtn}
-            onClick={() => handleGetLimsSamples(loginData.limsName[0].name)}
+            onClick={primary.onClick}
           >
             <i className="fas fa-sync-alt" style={{ marginRight: '0.5em' }} />
-            Get samples from {loginData.limsName[0].name}
+            {primary.label}
           </Button>
         </TooltipTrigger>
-        {/* Show the dropdown toggle only if there are multiple LIMS
-        or if the option to get samples from SC is enabled */}
-        {(loginData.limsName.length > 1 || showGetSamplesFromSC) && (
+        {showToggle && (
           <Dropdown.Toggle
             split
             variant="outline-secondary"
             id="dropdown-split-samples"
-            title="Other LIMS Options"
+            title="Other sync options"
           />
         )}
 
         <Dropdown.Menu>
-          {showGetSamplesFromSC && (
-            <TooltipTrigger tooltipContent="get samples from sample changer">
+          {/* Once samples are loaded, still allow re-pulling from the SC */}
+          {showGetSamplesFromSC && hasSamples && (
+            <TooltipTrigger tooltipContent="Re-populate the sample list from the sample changer">
               <Dropdown.Item
                 onClick={getSamplesFromSC}
                 variant="outline-secondary"
@@ -591,15 +624,14 @@ export default function SampleListViewContainer() {
               </Dropdown.Item>
             </TooltipTrigger>
           )}
-          {/* Skip the first LIMS as it is already included in the button above */}
-          {loginData.limsName.slice(1).map((lims, _) => (
+          {extraLims.map((lims, _) => (
             <TooltipTrigger
               key={`sync-samples-${lims.name}`}
               id={`sync-samples-${lims.name}`}
               tooltipContent={`Synchronise sample list with ${lims.name}`}
             >
               <Dropdown.Item onClick={() => handleGetLimsSamples(lims.name)}>
-                Get samples from {lims.name}
+                Sync with {lims.name}
               </Dropdown.Item>
             </TooltipTrigger>
           ))}
