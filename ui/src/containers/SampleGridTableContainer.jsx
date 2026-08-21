@@ -3,7 +3,7 @@ import 'slick-carousel/slick/slick-theme.css';
 
 import cx from 'classnames';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Col, Dropdown, Row, Table } from 'react-bootstrap';
+import { Button, Col, Dropdown, Nav, Row, Table } from 'react-bootstrap';
 import Collapsible from 'react-collapsible';
 import { BiMenu } from 'react-icons/bi';
 import {
@@ -129,6 +129,16 @@ function checkForOverlap(el1, el2) {
   return result;
 }
 
+// SOLEIL PX2 CATS: pucks are grouped into lids ("baskets") for the tabbed
+// samples view. 3 pucks per lid — the single edit point if the dewar changes
+// (matches SOLEILCats.baskets_per_lid).
+const PUCKS_PER_BASKET = 3;
+
+// Lid ("basket") a puck belongs to, from its numeric name (1..N).
+function basketOf(puckName) {
+  return Math.ceil(Number(puckName) / PUCKS_PER_BASKET);
+}
+
 // Helper function to determine puck colsm value
 function getColsm(isSingleCellAndNotFlex, puckCount) {
   if (isSingleCellAndNotFlex) {
@@ -171,6 +181,8 @@ export default function SampleGridTableContainer(props) {
   } = props;
 
   const [rubberBandVisible, setRubberBandVisible] = useState(false);
+  // Active lid ("basket") tab for the single-cell CATS view.
+  const [activeBasket, setActiveBasket] = useState(1);
 
   const isSingleCell = Object.values(sampleList).every(
     (sample) => sample.cell_no === 1 || sample.cell_no === 0,
@@ -602,9 +614,13 @@ export default function SampleGridTableContainer(props) {
 
     return scContent.children.filter((puck, puckidx) => {
       const puckID = isSingleCellAndNotFlex ? Number(puck.name) : puckidx + 1;
+      // In the single-cell CATS view, show only the pucks of the active lid tab.
+      const inActiveBasket =
+        !isSingleCellAndNotFlex || basketOf(puck.name) === activeBasket;
       const [filterList] = getSampleListFilteredByCellPuck(cellID, puckID);
 
       return (
+        inActiveBasket &&
         filterList.length > 0 &&
         (puckFilterValue === puckID || filterOptions.puckFilter === '')
       );
@@ -783,6 +799,35 @@ export default function SampleGridTableContainer(props) {
             {row}
           </div>
         ))}
+      </Col>
+    );
+  }
+
+  // Tab bar (one per lid) for the single-cell CATS view. Labelled "Basket N".
+  function getBasketTabs() {
+    const scContent = sampleChanger?.contents;
+    if (!isSingleCellAndNotFlex || !scContent?.children) {
+      return null;
+    }
+    const baskets = [
+      ...new Set(scContent.children.map((puck) => basketOf(puck.name))),
+    ].sort((a, b) => a - b);
+    if (baskets.length <= 1) {
+      return null;
+    }
+    return (
+      <Col sm={12} className="mb-2">
+        <Nav
+          variant="tabs"
+          activeKey={String(activeBasket)}
+          onSelect={(key) => setActiveBasket(Number(key))}
+        >
+          {baskets.map((b) => (
+            <Nav.Item key={`basket-${b}`}>
+              <Nav.Link eventKey={String(b)}>Basket {b}</Nav.Link>
+            </Nav.Item>
+          ))}
+        </Nav>
       </Col>
     );
   }
@@ -991,6 +1036,7 @@ export default function SampleGridTableContainer(props) {
       >
         <div className={styles.selectionRubberBand} id="selectionRubberBand" />
         {getManualSamples()}
+        {getBasketTabs()}
         {viewMode === 'Graphical View' ? (
           <>
             {getSampleListAsDrawing()}
