@@ -9,7 +9,6 @@ import BeamlineAttribute from '../components/BeamlineAttribute/BeamlineAttribute
 import BeamlineCamera from '../components/BeamlineCamera/BeamlineCamera';
 import DeviceState from '../components/DeviceState/DeviceState';
 import InOutSwitch from '../components/InOutSwitch/InOutSwitch';
-import MachInfo from '../components/MachInfo/MachInfo';
 import OneAxisTranslationControl from '../components/MotorInput/OneAxisTranslationControl';
 import SampleChangerInfo from '../components/SampleChangerInfo/SampleChangerInfo';
 import BeamlineActions from './BeamlineActionsContainer';
@@ -158,6 +157,49 @@ function BeamlineSetupContainer() {
     return components;
   }
 
+  // Ring Current + Sample Temp come from the machine_info HO (real Tango
+  // values), not from a BeamlineAttribute uiprop, so render them as plain
+  // label:value cells in the same style as renderTableRow.
+  function renderMachineInfoCells() {
+    const mi = hardwareObjects.machine_info;
+    if (!mi || !mi.value) {
+      return [];
+    }
+    const info = mi.value;
+
+    const rawTemp = info.sampleTemp;
+    const hasTemp =
+      rawTemp !== undefined &&
+      rawTemp !== null &&
+      !Number.isNaN(Number(rawTemp));
+
+    const entries = [['Ring Current', info.current]];
+    if (hasTemp) {
+      entries.push(['Sample Temp', `${Number(rawTemp).toFixed(1)} K`]);
+    }
+
+    const cells = [];
+    entries.forEach(([label, value], index) => {
+      cells.push(
+        <td key={`mi-name-${label}`} className="py-1 ps-3 pe-2 align-middle">
+          <span className="me-1">{label}:</span>
+        </td>,
+        <td
+          key={`mi-val-${label}`}
+          style={{
+            padding: '0.125rem 0.625rem 0.125rem 0',
+            verticalAlign: 'middle',
+            borderRight:
+              index !== entries.length - 1 ? '1px solid #ddd' : undefined,
+          }}
+        >
+          {value}
+        </td>,
+      );
+    });
+    return cells;
+  }
+
   if (!beamlineProperties) {
     return null;
   }
@@ -202,6 +244,7 @@ function BeamlineSetupContainer() {
                   {renderTableRow(
                     uiprop_list.slice((uiprop_list.length / 2).toFixed(0)),
                   )}
+                  {renderMachineInfoCells()}
                   <td
                     style={{
                       border: 0,
@@ -222,13 +265,6 @@ function BeamlineSetupContainer() {
             />
           </Nav.Item>
           {renderActuatorComponent()}
-          <Nav.Item className="ms-3">
-            <span className="blstatus-item">
-              {hardwareObjects.machine_info && (
-                <MachInfo info={hardwareObjects.machine_info.value} />
-              )}
-            </span>
-          </Nav.Item>
         </Nav>
       </Navbar.Collapse>
     </Navbar>
