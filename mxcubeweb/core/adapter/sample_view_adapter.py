@@ -430,7 +430,7 @@ class SampleViewAdapter(AdapterBase):
             raise RuntimeError(msg) from e
 
     def abort_centring(self):
-        self._ho.abort_centring()
+        self._ho.cancel_centring()
         return {}
 
     def click(self, x: float, y: float):

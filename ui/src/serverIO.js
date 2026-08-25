@@ -28,11 +28,11 @@ import {
   setCurrentSample,
   setSampleAttribute,
   setStatus,
-  stopQueue,
 } from './actions/queue';
 import { collapseItem, showResumeQueueDialog } from './actions/queueGUI';
 import { addChatMessage, getRaState } from './actions/remoteAccess';
 import {
+  abort as abortSampleChanger,
   setLoadedSample,
   setSCGlobalState,
   setSCState,
@@ -239,7 +239,7 @@ class ServerIO {
               'Sample changer in operation',
               record.message,
               true,
-              () => dispatch(stopQueue()),
+              () => dispatch(abortSampleChanger()),
             ),
           );
 
@@ -253,7 +253,7 @@ class ServerIO {
               `Loading sample ${record.location}`,
               record.message,
               true,
-              () => dispatch(stopQueue()),
+              () => dispatch(abortSampleChanger()),
             ),
           );
 
@@ -267,7 +267,7 @@ class ServerIO {
               `Unloading sample ${record.location}`,
               record.message,
               true,
-              () => dispatch(stopQueue()),
+              () => dispatch(abortSampleChanger()),
             ),
           );
 
