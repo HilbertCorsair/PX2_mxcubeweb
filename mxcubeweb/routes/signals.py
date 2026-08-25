@@ -137,7 +137,13 @@ def queue_execution_finished(entry, queue_state=None):
     mxcube.TEMP_DISABLED = []
 
     server.emit("queue", msg, namespace="/hwr")
-    mxcube.sample_view._emit_shapes_updated()
+
+    # `_emit_shapes_updated` lives on the SampleView *adapter*, not on the
+    # application object — reach it through the adapter manager and guard in
+    # case the sample_view role is not configured.
+    sample_view = mxcube.mxcubecore.get_adapter("sample_view")
+    if sample_view is not None:
+        sample_view._emit_shapes_updated()
 
 
 def queue_execution_stopped(*args):
