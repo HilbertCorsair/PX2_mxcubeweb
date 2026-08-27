@@ -32,6 +32,10 @@ export function sendUnmountCurrentSample() {
   return _sendSampleChangerCommand('unmount_current', {});
 }
 
+export function sendWashSample() {
+  return _sendSampleChangerCommand('wash', {});
+}
+
 export function sendAbortSampleChanger() {
   return _sendSampleChangerCommand('send_command', {
     cmd: 'abort',

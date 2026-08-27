@@ -7,6 +7,7 @@ import {
   sendScanSampleChanger,
   sendSelectContainer,
   sendUnmountCurrentSample,
+  sendWashSample,
 } from '../api/sampleChanger';
 import { showErrorPanel } from './general';
 import { clearCurrentSample } from './queue';
@@ -104,6 +105,19 @@ export function unmountSample() {
     try {
       await sendUnmountCurrentSample();
       dispatch(clearCurrentSample());
+    } catch (error) {
+      dispatch(showErrorPanel(true, error.response.headers.get('message')));
+    }
+  };
+}
+
+// Unmount and re-mount the same pin. The sample stays mounted, so unlike
+// unmountSample this must not clear the current sample; the backend clears
+// the sample view because the centring no longer holds.
+export function washSample() {
+  return async (dispatch) => {
+    try {
+      await sendWashSample();
     } catch (error) {
       dispatch(showErrorPanel(true, error.response.headers.get('message')));
     }

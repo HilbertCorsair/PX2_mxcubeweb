@@ -22,7 +22,11 @@ import { bindActionCreators } from 'redux';
 
 import { showDialog } from '../actions/general';
 import { deleteTask } from '../actions/queue';
-import { mountSample, unmountSample } from '../actions/sampleChanger';
+import {
+  mountSample,
+  unmountSample,
+  washSample,
+} from '../actions/sampleChanger';
 import {
   selectSamplesAction,
   showGenericContextMenu,
@@ -878,6 +882,12 @@ export default function SampleGridTableContainer(props) {
     dispatch(unmountSample());
   }
 
+  // Only ever reachable from the mounted-sample menu (MOUNTED_MENU_ID), so no
+  // extra guard on whether something is loaded is needed here.
+  function wash() {
+    dispatch(washSample());
+  }
+
   function getTaskContextMenuItems() {
     return (
       <>
@@ -939,6 +949,11 @@ export default function SampleGridTableContainer(props) {
         <Dropdown.Item onClick={addSelectedSamplesToQueue}>
           <span>
             <i className="fas fa-plus" /> Add to Queue
+          </span>
+        </Dropdown.Item>
+        <Dropdown.Item onClick={wash}>
+          <span>
+            <i className="fas fa-tint" /> Wash{' '}
           </span>
         </Dropdown.Item>
         <Dropdown.Item onClick={unmount}>

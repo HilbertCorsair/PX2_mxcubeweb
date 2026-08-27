@@ -345,15 +345,23 @@ class SampleImage extends React.Component {
   }
 
   goToBeam(e) {
-    const { imageRatio } = this.props;
+    const {
+      imageRatio,
+      centringEnabled,
+      clickCentring,
+      measureDistance,
+      drawGrid,
+    } = this.props;
 
-    // Beam geometry is only valid on the OAV/centring camera.
-    if (!this.props.centringEnabled) {
+    // Beam geometry is only valid on the OAV/centring camera, and a
+    // double-click must not disturb a click-centring, distance-measuring or
+    // grid-drawing sequence that is already in progress.
+    if (!centringEnabled || clickCentring || measureDistance || drawGrid) {
       return;
     }
 
     // Only move to beam if the click was done directly on the canvas.
-    if (e.target.tagName === 'CANVAS' && e.shiftKey) {
+    if (e.target.tagName === 'CANVAS') {
       this.props.moveToBeam(e.layerX / imageRatio, e.layerY / imageRatio);
     }
   }

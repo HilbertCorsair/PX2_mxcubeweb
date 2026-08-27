@@ -7,6 +7,7 @@ import ActionGroup from './ActionGroup';
 import styles from './equipment.module.css';
 
 const LIDS = [1, 2, 3];
+const REGULATION_CMDS = new Set(['regulon', 'reguloff']);
 
 function SampleChangerMaintenance() {
   const dispatch = useDispatch();
@@ -38,28 +39,73 @@ function SampleChangerMaintenance() {
     );
   }
 
+  // Same idea for LN2 regulation: one reactive switch driven by
+  // global_state.regulating instead of a one-way "Regulation On" button.
+  // Green while regulating, red while not; the backend enables whichever
+  // direction is applicable and disables both when the power is off.
+  function renderRegulationToggle() {
+    const regulating = Boolean(global_state?.regulating);
+    const cmd = regulating ? 'reguloff' : 'regulon';
+    return (
+      <Button
+        key="regulation"
+        className="me-2"
+        size="sm"
+        variant={regulating ? 'outline-success' : 'outline-danger'}
+        disabled={!commands_state[cmd]}
+        onClick={() => dispatch(sendCommand(cmd))}
+      >
+        {`Regulation: ${regulating ? 'ON' : 'OFF'}`}
+      </Button>
+    );
+  }
+
+  function renderActionButtons(grpCmds) {
+    return grpCmds.map(([cmd, cmdLabel, , cmdArgs]) => (
+      <ActionButton
+        key={cmd}
+        label={cmdLabel}
+        disabled={!commands_state[cmd]}
+        onSend={() => dispatch(sendCommand(cmd, cmdArgs))}
+      />
+    ));
+  }
+
+  function renderGroup(grpLabel, grpCmds) {
+    if (grpLabel === 'Lids') {
+      return (
+        <Card key={grpLabel} className="mb-2">
+          <Card.Header>{grpLabel}</Card.Header>
+          <Card.Body>
+            <ButtonGroup>{LIDS.map((n) => renderLidToggle(n))}</ButtonGroup>
+          </Card.Body>
+        </Card>
+      );
+    }
+
+    if (grpLabel === 'Power') {
+      // The two regulation commands are replaced by a single toggle.
+      return (
+        <ActionGroup key={grpLabel} label={grpLabel}>
+          {renderActionButtons(
+            grpCmds.filter(([cmd]) => !REGULATION_CMDS.has(cmd)),
+          )}
+          {renderRegulationToggle()}
+        </ActionGroup>
+      );
+    }
+
+    return (
+      <ActionGroup key={grpLabel} label={grpLabel}>
+        {renderActionButtons(grpCmds)}
+      </ActionGroup>
+    );
+  }
+
   return (
     <>
       {commandGroups.map(([grpLabel, grpCmds]) =>
-        grpLabel === 'Lids' ? (
-          <Card key={grpLabel} className="mb-2">
-            <Card.Header>{grpLabel}</Card.Header>
-            <Card.Body>
-              <ButtonGroup>{LIDS.map((n) => renderLidToggle(n))}</ButtonGroup>
-            </Card.Body>
-          </Card>
-        ) : (
-          <ActionGroup key={grpLabel} label={grpLabel}>
-            {grpCmds.map(([cmd, cmdLabel, , cmdArgs]) => (
-              <ActionButton
-                key={cmd}
-                label={cmdLabel}
-                disabled={!commands_state[cmd]}
-                onSend={() => dispatch(sendCommand(cmd, cmdArgs))}
-              />
-            ))}
-          </ActionGroup>
-        ),
+        renderGroup(grpLabel, grpCmds),
       )}
 
       {message && (

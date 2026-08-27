@@ -34,6 +34,7 @@ resource_handler_config = ResourceHandlerConfigModel(
         "scan_location",
         "unmount_current",
         "mount_sample",
+        "wash",
         "send_command",
     ],
 )
@@ -357,6 +358,36 @@ class SampleChangerAdapter(AdapterBase):
             self._unmount_sample("Manual")
 
         return HWR.beamline.sample_changer.get_contents_as_dict()
+
+    def wash(self):
+        """Unmount and re-mount the currently loaded sample.
+
+        The same pin comes back, so the queue entry and the mounted-sample
+        bookkeeping are left alone (unlike `_unmount_sample`). The centring is
+        no longer valid after the round trip, so the sample view is cleared.
+        """
+        sc = HWR.beamline.sample_changer
+        sc_sample = sc.get_loaded_sample()
+
+        if sc_sample is None:
+            msg = "Cannot wash: no sample mounted"
+            raise RuntimeError(msg)
+
+        location = sc_sample.get_address()
+
+        try:
+            self._sc_unload(location)
+            sc.wash(wait=True)
+        except Exception as _ex:
+            logger.exception("SC cannot wash sample %s", location)
+            msg = f"Cannot wash sample {escape(location)}"
+            raise RuntimeError(msg) from _ex
+        finally:
+            self._sc_load_ready(location)
+
+        HWR.beamline.sample_view.clear_all()
+
+        return sc.get_contents_as_dict()
 
     def send_command(self, command: SampleChangerCommandInputModel):
         try:

@@ -9,7 +9,7 @@ import {
   stopQueue,
 } from '../../actions/queue';
 import { showConfirmCollectDialog } from '../../actions/queueGUI';
-import { unmountSample } from '../../actions/sampleChanger';
+import { unmountSample, washSample } from '../../actions/sampleChanger';
 import { QUEUE_PAUSED, QUEUE_RUNNING, QUEUE_STOPPED } from '../../constants';
 
 export default function QueueControlOptions() {
@@ -19,6 +19,11 @@ export default function QueueControlOptions() {
   const queue = useSelector((state) => state.queue.queue);
   const currentSampleID = useSelector((state) => state.queue.currentSampleID);
   const sampleList = useSelector((state) => state.sampleGrid.sampleList);
+  // Washing re-loads the pin that is physically on the goniometer, so it is
+  // gated on the sample changer's loaded sample, not on the queue.
+  const loadedSampleAddress = useSelector(
+    (state) => state.sampleChanger.loadedSample.address,
+  );
 
   if (!queue) {
     return null;
@@ -87,6 +92,16 @@ export default function QueueControlOptions() {
           {currentSampleID && (
             <Button variant={buttonStyle} onClick={getNextSample}>
               {buttonText}
+            </Button>
+          )}
+          {loadedSampleAddress && (
+            <Button
+              variant="outline-primary"
+              style={{ marginLeft: '0.6em' }}
+              title="Unmount and re-mount the loaded sample"
+              onClick={() => dispatch(washSample())}
+            >
+              Wash
             </Button>
           )}
         </div>
