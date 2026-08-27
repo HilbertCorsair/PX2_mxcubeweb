@@ -22,7 +22,7 @@ import { bindActionCreators } from 'redux';
 
 import { showDialog } from '../actions/general';
 import { deleteTask } from '../actions/queue';
-import { unmountSample } from '../actions/sampleChanger';
+import { mountSample, unmountSample } from '../actions/sampleChanger';
 import {
   selectSamplesAction,
   showGenericContextMenu,
@@ -858,14 +858,17 @@ export default function SampleGridTableContainer(props) {
   }
 
   function mountAndCollect() {
-    // Enqueue the selection and go to data collection. The mount is left to the
-    // queue (base_queue_entry -> sample_changer.load) so the sample changer
-    // receives a single load command from one source. Firing a direct
-    // mountSample here as well produced a second, overlapping command to the
-    // CATS device (the load plus the queue's own mount), so it is removed.
+    // Mount the selected sample now, enqueue the selection and go to data
+    // collection. `mountSample` no-ops when that sample is already the loaded
+    // one (see actions/sampleChanger), and the backend `_mount_sample` skips
+    // `load` when the requested address is already mounted, so this direct
+    // mount does not double up with the queue's own mount when a collection
+    // later runs. The earlier double-command to CATS came from the backend
+    // signal being routed twice, which is fixed on the core side.
     const sampleData = sampleList[Object.keys(selected)[0]];
 
     if (sampleData) {
+      dispatch(mountSample(sampleData));
       addSelectedSamplesToQueue();
       navigate('/datacollection', { replace: true });
     }
