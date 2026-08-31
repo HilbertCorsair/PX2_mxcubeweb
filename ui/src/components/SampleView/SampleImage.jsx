@@ -43,6 +43,11 @@ const { fabric } = globalThis;
 fabric.Group.prototype.hasControls = false;
 fabric.Group.prototype.hasBorders = false;
 
+// Plain mouse-wheel rotation on the OAV camera (no modifier key), asymmetric by design.
+// At PX2, counter-clockwise on screen = decreasing omega.
+const WHEEL_ROTATE_CCW_DEG = 90; // scroll down -> 90 deg counter-clockwise
+const WHEEL_ROTATE_CW_DEG = 30; // scroll up -> 30 deg clockwise
+
 class SampleImage extends React.Component {
   constructor(props) {
     super(props);
@@ -610,7 +615,27 @@ class SampleImage extends React.Component {
     const focus = hardwareObjects[focusProps?.attribute] ?? focusProps;
     const zoom = hardwareObjects[zoomProps?.attribute] ?? zoomProps;
 
-    if (keyPressed === 'r' && omega.state === HW_STATE.READY) {
+    if (
+      !keyPressed &&
+      this.props.centringEnabled &&
+      !this.props.clickCentring &&
+      omega.state === HW_STATE.READY
+    ) {
+      // Plain scroll on the OAV camera (outside 3-click centring): spin the sample.
+      if (e.deltaY > 0) {
+        // scroll down -> counter-clockwise -> decrease omega
+        this.props.setAttribute(
+          omegaProps.attribute,
+          omega.value - WHEEL_ROTATE_CCW_DEG,
+        );
+      } else if (e.deltaY < 0) {
+        // scroll up -> clockwise -> increase omega
+        this.props.setAttribute(
+          omegaProps.attribute,
+          omega.value + WHEEL_ROTATE_CW_DEG,
+        );
+      }
+    } else if (keyPressed === 'r' && omega.state === HW_STATE.READY) {
       if (e.deltaY > 0) {
         this.props.setAttribute(
           omegaProps.attribute,

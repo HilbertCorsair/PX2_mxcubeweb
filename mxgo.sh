@@ -48,7 +48,16 @@ start_argussight() {
     "$ARGUS_DIR/start_argus.sh" $flag &
 }
 
-start_argussight
+# argussight + streamers started manually (start_argus.sh --with-oav already
+# running); skip auto-start here.
+# start_argussight
 
-mxcubeweb-server --export-yaml-config $(pwd)/../config/
-mxcubeweb-server -r $(pwd)/../config/ --static-folder $(pwd)/mxcubeweb/ui/build/ -L debug -l $HOME/MXCuBElogs/mxcube.log
+# Run the real beamline config (webconfig) directly, by absolute path. The old
+# `--export-yaml-config .../config/` pass wrote a lossy normalized copy (truncated
+# class strings, reindented server.yaml) into the hardcoded default dir
+# (mxcubeweb/__init__.py:28 = .../WebApp/config) that the following `-r` then
+# loaded -> lims/detector = None -> usermanager crash, and printed the HW table
+# twice. `-r` reads the source config directly, so one clean load. The dir must
+# contain a file named exactly `beamline.yaml` (HardwareRepository.BEAMLINE_CONFIG_FILES).
+CONFIG_DIR=/nfs/ruche/share-dev/px2dev/MXCuBE/WebApp/webconfig
+mxcubeweb-server -r "$CONFIG_DIR" --static-folder $(pwd)/mxcubeweb/ui/build/ -L debug -l $HOME/MXCuBElogs/mxcube.log
