@@ -57,14 +57,16 @@ class SampleViewAdapter(AdapterBase):
         self._ho.connect("shapesChanged", self._emit_shapes_updated)
         self._ho.connect("newGridResult", self._handle_grid_result)
 
-        dm = HWR.beamline.diffractometer
+        # Centring lives on the sample view, not on the diffractometer: it is
+        # SampleView that owns current_centring_procedure and emits these four
+        # signals. Subscribing on the diffractometer silently produced a UI
+        # that never heard a centring event.
+        self._ho.connect("centringStarted", self._centring_started)
+        self._ho.connect("centringSuccessful", self._wait_for_centring_finishes)
+        self._ho.connect("centringFailed", self._wait_for_centring_finishes)
+        self._ho.connect("centringAccepted", self._centring_add_current_point)
 
-        dm.connect("centringStarted", self._centring_started)
-        dm.connect("centringSuccessful", self._wait_for_centring_finishes)
-        dm.connect("centringFailed", self._wait_for_centring_finishes)
-        dm.connect("centringAccepted", self._centring_add_current_point)
-
-        zoom_motor = dm.get_object_by_role("zoom")
+        zoom_motor = HWR.beamline.diffractometer.get_object_by_role("zoom")
 
         if zoom_motor:
             zoom_motor.connect("stateChanged", self._zoom_changed)
@@ -78,9 +80,7 @@ class SampleViewAdapter(AdapterBase):
             try:
                 if args[0]:
                     motors = args[1]["motors"]
-                    (x, y) = HWR.beamline.diffractometer.motor_positions_to_screen(
-                        motors
-                    )
+                    (x, y) = self._ho.motor_positions_to_screen(motors)
                     self._centring_update_current_point(motors, x, y)
                     shape = self._ho.get_shape(self._centring_point_id)
             except Exception:
@@ -123,21 +123,22 @@ class SampleViewAdapter(AdapterBase):
             motor_positions.pop("beam_y", None)
             motor_positions.pop("beam_x", None)
 
-            (x, y) = HWR.beamline.diffractometer.motor_positions_to_screen(
-                motor_positions
-            )
+            (x, y) = self._ho.motor_positions_to_screen(motor_positions)
 
             self._centring_update_current_point(motor_positions, x, y)
 
             if self.app.AUTO_MOUNT_SAMPLE:
-                HWR.beamline.diffractometer.accept_centring()
+                self._ho.accept_centring()
 
     def _centring_started(self, method, *args):  # noqa: ARG002
         msg = {"method": method}
 
-        if method in ["Computer automatic"]:
+        # "Manual" / "Automatic" are the literals SampleView emits; the legacy
+        # GenericDiffractometer CENTRING_METHOD_* constants do not exist on
+        # AbstractDiffractometer.
+        if method in ["Computer automatic", "Automatic"]:
             msg = {"method": qe.CENTRING_METHOD.LOOP}
-        elif method in [HWR.beamline.diffractometer.CENTRING_METHOD_MANUAL]:
+        elif method == "Manual":
             msg = {"method": qe.CENTRING_METHOD.MANUAL}
 
         self.app.server.emit("sample_centring", msg, namespace="/hwr")
@@ -362,7 +363,7 @@ class SampleViewAdapter(AdapterBase):
                 if not refs:
                     try:
                         x, y = shape_data["screen_coord"]
-                        mpos = dm.get_centred_point_from_coord(
+                        mpos = self._ho.get_centred_point_from_coord(
                             x, y, return_by_names=True
                         )
                         pos.append(mpos)
@@ -380,7 +381,7 @@ class SampleViewAdapter(AdapterBase):
                                 + (shape_data["num_rows"] / 2.0)
                                 * shape_data["cell_height"]
                             )
-                            center_positions = dm.get_centred_point_from_coord(
+                            center_positions = self._ho.get_centred_point_from_coord(
                                 x_c, y_c, return_by_names=True
                             )
                             pos.append(center_positions)
@@ -420,7 +421,7 @@ class SampleViewAdapter(AdapterBase):
 
     def centre_click(self):
         try:
-            return self._ho.start_manual_centring()
+            return self._ho.start_manual_centring(self._click_limit)
         except Exception as e:
             msg = "Could not start %s click centring"
             self.app.server_logger.exception(
@@ -434,9 +435,9 @@ class SampleViewAdapter(AdapterBase):
         return {}
 
     def click(self, x: float, y: float):
-        if HWR.beamline.diffractometer.current_centring_procedure:
+        if self._ho.current_centring_procedure:
             try:
-                HWR.beamline.diffractometer.image_clicked(x, y)
+                self._ho.image_clicked(x, y)
                 self.centring_click()
             except Exception:
                 logging.getLogger("MX3.HWR").exception("")
@@ -444,16 +445,13 @@ class SampleViewAdapter(AdapterBase):
 
         elif not self.centring_clicks_left():
             self.centring_reset_click_count()
-            HWR.beamline.diffractometer.cancel_centring_method()
-
-            HWR.beamline.diffractometer.start_centring_method(
-                HWR.beamline.diffractometer.CENTRING_METHOD_MANUAL
-            )
+            self._ho.cancel_centring()
+            self._ho.start_manual_centring(self._click_limit)
 
         return {"clicksLeft": self.centring_clicks_left()}
 
     def accept_centring(self):
-        HWR.beamline.diffractometer.accept_centring()
+        self._ho.accept_centring()
         return {}
 
     def move_to_beam(self, x: float, y: float):
@@ -462,13 +460,11 @@ class SampleViewAdapter(AdapterBase):
 
     def start_auto_centring(self):
         """Start automatic centring procedure."""
-        if not HWR.beamline.diffractometer.current_centring_procedure:
+        if not self._ho.current_centring_procedure:
             msg = "Starting automatic centring"
             logging.getLogger("user_level_log").info(msg)
 
-            HWR.beamline.diffractometer.start_centring_method(
-                HWR.beamline.diffractometer.C3D_MODE
-            )
+            self._ho.start_auto_centring()
         else:
             msg = "Could not starting automatic centring, already centring."
             logging.getLogger("user_level_log").info(msg)
@@ -480,19 +476,17 @@ class SampleViewAdapter(AdapterBase):
             clicksLeft
         """
         if HWR.beamline.diffractometer.is_ready():
-            if HWR.beamline.diffractometer.current_centring_procedure:
+            if self._ho.current_centring_procedure:
                 logging.getLogger("user_level_log").info(
                     "Aborting current centring ..."
                 )
-                HWR.beamline.diffractometer.cancel_centring_method(reject=True)
+                self._ho.reject_centring()
             msg = "Centring using %s-click centring"
             logging.getLogger("user_level_log").info(
                 msg, HWR.beamline.config.click_centring_num_clicks
             )
 
-            HWR.beamline.diffractometer.start_centring_method(
-                HWR.beamline.diffractometer.CENTRING_METHOD_MANUAL
-            )
+            self._ho.start_manual_centring(self._click_limit)
 
             self.centring_reset_click_count()
         else:
