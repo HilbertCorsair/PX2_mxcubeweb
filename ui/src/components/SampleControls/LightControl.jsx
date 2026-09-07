@@ -3,7 +3,10 @@ import { Button, OverlayTrigger, Popover } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { sendExecuteCommand } from '../../api/hardware-object';
-import { setAttribute } from '../../actions/beamline';
+import {
+  setAttribute,
+  updateBeamlineHardwareObjectAction,
+} from '../../actions/beamline';
 import { HW_STATE } from '../../constants';
 import styles from './SampleControls.module.css';
 
@@ -20,9 +23,22 @@ function LightControl(props) {
   const switchValue = light.switch_value || 'OUT';
   const switchCommands = light.switch_commands || ['IN', 'OUT'];
 
-  function handleToggleClick() {
+  async function handleToggleClick() {
     const next = switchCommands.find((cmd) => cmd !== switchValue);
-    sendExecuteCommand('light', hwoId, 'set_switch', { value: next });
+    const res = await sendExecuteCommand('light', hwoId, 'set_switch', {
+      value: next,
+    });
+
+    // The backend also pushes the new state over the socket; applying the
+    // returned value keeps the button in sync if that message is missed.
+    if (res && switchCommands.includes(res.return)) {
+      dispatch(
+        updateBeamlineHardwareObjectAction({
+          name: hwoId,
+          switch_value: res.return,
+        }),
+      );
+    }
   }
 
   return (

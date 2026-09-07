@@ -6,6 +6,7 @@ payload, plus a ``set_switch`` command, so ``LightControl.jsx`` can drive
 the on/off button off the same hardware object as the slider.
 """
 
+import logging
 from typing import ClassVar
 
 from mxcubecore.HardwareObjects.MicrodiffLight import MicrodiffLight
@@ -44,6 +45,12 @@ class LightAdapter(MotorAdapter):
 
     def set_switch(self, value: str) -> str:
         self._ho.set_switch(value)
+        # The HTTP route calls this method directly, bypassing
+        # AdapterBase.execute_command / _command_success -- which is what
+        # normally emits `hardware_object_changed` after a command. Push the
+        # fresh payload ourselves so the button updates even if the MD2 never
+        # sends a channel event.
+        self.emit_ho_changed(self._ho.get_state())
         return self._ho.switch_value()
 
     def _dict_repr(self):
@@ -52,6 +59,9 @@ class LightAdapter(MotorAdapter):
             data["switch_value"] = self._ho.switch_value()
             data["switch_commands"] = self._ho.switch_commands()
         except Exception:
+            logging.getLogger("MX3.HWR").exception(
+                f"Could not read switch state of {self._ho.name}"
+            )
             data["switch_value"] = "OUT"
             data["switch_commands"] = ["IN", "OUT"]
         return data
